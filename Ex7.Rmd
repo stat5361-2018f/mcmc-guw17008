@@ -1,0 +1,139 @@
+---
+title: "Ex7"
+author: "Guanting Wei"
+date: "Oct.24.2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. MCMC With Gibbs Sampling
+We have parameters below.
+$$\mu_1 \sim N(0,10^2)$$
+$$\mu_2 \sim N(0,10^2)$$
+$$\frac{1}{\sigma_1^2}\sim \Gamma(a,b)$$
+$$\frac{1}{\sigma_2^2}\sim \Gamma(a,b)$$
+$$a=0.5, \ b=10, \lambda=\frac{1}{b}=\frac{1}{10}$$
+$$\sigma_1^2\sim IG(0.5,10)$$
+$$\sigma_2^2\sim IG(0.5,10)$$
+$$\delta\sim U(0,1)$$
+
+The density function of X is a mixture normal distribution.
+$$f(x)=\delta \frac{1}{\sqrt{2\pi}\sigma_1}e^{-\frac{(x-\mu_1)^2}{2\sigma_1^2}}+(1-\delta)\frac{1}{\sqrt{2\pi}\sigma_2}e^{-\frac{(x-\mu_2)^2}{2\sigma_2^2}}$$
+The Likelihood function is as follow. 
+$$L(x;\delta,\mu_1,\sigma_1^2,\mu_2,\sigma_2^2)=\prod_{i=1}^{n} (\delta \frac{1}{\sqrt{2\pi}\sigma_1}e^{-\frac{(x-\mu_1)^2}{2\sigma_1^2}}+(1-\delta)\frac{1}{\sqrt{2\pi}\sigma_2}e^{-\frac{(x-\mu_2)^2}{2\sigma_2^2}})$$
+The joint posterior probability is as follow.
+\[
+\begin{aligned}
+P(\delta,\mu_1,\sigma_1^2,\mu_2,\sigma_2^2|x)&\propto L(x;\delta,\mu_1,\sigma_1^2,\mu_2,\sigma_2^2)*f_1(\mu_1)*f_2(\mu_2)*f_3(\sigma_1^2)*f_4(\sigma_2^2)
+\\&=\prod_{i=1}^{n} (\delta \frac{1}{\sqrt{2\pi}\sigma_1}e^{-\frac{(x-\mu_1)^2}{2\sigma_1^2}}+(1-\delta)\frac{1}{\sqrt{2\pi}\sigma_2}e^{-\frac{(x-\mu_2)^2}{2\sigma_2^2}})\\&\times 1\times\frac{1}{10\sqrt{2\pi}}e^{-\frac{\mu_1^2}{2\times 10^2}}\times\frac{1}{\sqrt{10}\sqrt{2\pi}}\frac{1}{(\sigma_1^2)^\frac{3}{2}}e^{-\frac{1}{10\sigma_1^2}}\times\frac{1}{10\sqrt{2\pi}}e^{-\frac{\mu_2^2}{2\times 10^2}}\times\frac{1}{\sqrt{10}\sqrt{2\pi}}\frac{1}{(\sigma_2^2)^\frac{3}{2}}e^{-\frac{1}{10\sigma_2^2}}
+\end{aligned}
+\]
+
+We need to get
+$$P(\delta|x,\mu_1,\sigma_1^2,\mu_2,\sigma_2^2),P(\mu_1|x,\delta,\sigma_1^2,\mu_2,\sigma_2^2),P(\sigma_1^2|x,\delta,\mu_1,\mu_2,\sigma_2^2),P(\mu_2|x,\delta,\mu_1,\sigma_1^2,\sigma_2^2),P(\sigma_2^2|x,\delta,\mu_1,\sigma_1^2,\mu_2)$$
+
+$\\$
+$\\$
+$\\$
+$\\$
+
+# 2. Code And Graph
+```{r}
+library(actuar)
+delta <- 0.7 # true value to be estimated based on the data
+n <- 100
+set.seed(123)
+u <- rbinom(n, prob = delta, size = 1)
+x <- rnorm(n, ifelse(u == 1, 7, 10), 0.5)
+
+loglikelihood=function(delta,mu1,mu2,var1,var2){
+  sum(log(delta*dnorm(x,mu1,sqrt(var1))+(1-delta)*dnorm(x,mu2,sqrt(var2))))
+}
+prior=function(delta,mu1,mu2,var1,var2){
+  delta.prior=1
+  mu1.prior=dnorm(mu1,0,10)
+  mu2.prior=dnorm(mu2,0,10)
+  var1.prior=dinvgamma(var1,0.5,10)
+  var2.prior=dinvgamma(var2,0.5,10)
+  log(mu1.prior*mu2.prior*var1.prior*var2.prior)
+}
+all=function(delta,mu1,mu2,var1,var2){
+  loglikelihood(delta,mu1,mu2,var1,var2)+prior(delta,mu1,mu2,var1,var2)
+}
+library(HI)
+mcmcgibbs=function(delta.start,mu1.start,mu2.start,var1.start,var2.start,count){
+  delta.new=rep(0,count)
+  mu1.new=rep(0,count)
+  mu2.new=rep(0,count)
+  var1.new=rep(0,count)
+  var2.new=rep(0,count)
+  for(i in 1:count){
+    delta.new[i]=arms(delta.start,all,function(x,mu1,mu2,var1,var2)(x>0)*(x<1),1,
+                      mu1=mu1.start,mu2=mu2.start,var1=var1.start,var2=var2.start)
+    mu1.new[i]=arms(mu1.start,all,function(delta,x,mu2,var1,var2)(x>-50)*(x<50),1,
+                    delta=delta.start,mu2=mu2.start,var1=var1.start,var2=var2.start)
+    mu2.new[i]=arms(mu2.start,all,function(delta,mu1,x,var1,var2)(x>-50)*(x<50),1,
+                    mu1=mu1.start,delta=delta.start,var1=var1.start,var2=var2.start)
+    var1.new[i]=arms(var1.start,all,function(delta,mu1,mu2,x,var2)(x>0.00001)*(x<100),1,
+                     mu1=mu1.start,mu2=mu2.start,delta=delta.start,var2=var2.start)
+    var2.new[i]=arms(var2.start,all,function(delta,mu1,mu2,var1,x)(x>0.00001)*(x<100),1,
+                     mu1=mu1.start,mu2=mu2.start,var1=var1.start,delta=delta.start)
+    delta.start=delta.new[i]
+    mu1.start=mu1.new[i]
+    mu2.start=mu2.new[i]
+    var1.start=var1.new[i]
+    var2.start=var2.new[i]
+  }
+  rbind(delta.new,mu1.new,mu2.new,var1.new,var2.new)
+}
+```
+
+With initial value$\delta^{(0)}=0.5,\mu_1^{(0)}=0,{\sigma_1^2}^{(0)}=0,\mu_2^{(0)}=10,{\sigma_2^2}^{(0)}=10$, we run the 5000 times and throw away the first 2500.
+
+```{r}
+data=mcmcgibbs(0.5,0,0,10,10,5000)[,-(1:2500)]
+
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data.frame(x=data[1,]),aes(x=x))+
+xlab(~delta)+
+ylab("density")+
+ggtitle(~delta)+
+geom_histogram(aes(y=..density..),fill="gray", colour="black")
+plot(ts(data[1,]),xlab="Time",ylab=~delta)
+
+ggplot(data.frame(x=data[2,]),aes(x=x))+
+xlab(~mu[1])+
+ylab("density")+
+ggtitle(~mu[1])+
+geom_histogram(aes(y=..density..),fill="gray", colour="black")
+plot(ts(data[2,]),xlab="Time",ylab=~mu[1])
+
+ggplot(data.frame(x=data[3,]),aes(x=x))+
+xlab(~mu[2])+
+ylab("density")+
+ggtitle(~mu[2])+
+geom_histogram(aes(y=..density..),fill="gray", colour="black")
+plot(ts(data[3,]),xlab="Time",ylab=~mu[2])
+
+ggplot(data.frame(x=data[4,]),aes(x=x))+
+xlab(~sigma[1]^2)+
+ylab("density")+
+ggtitle(~sigma[1]^2)+
+geom_histogram(aes(y=..density..),fill="gray", colour="black")
+plot(ts(data[4,]),xlab="Time",ylab=~sigma[1]^2)
+
+ggplot(data.frame(x=data[5,]),aes(x=x))+
+xlab(~sigma[2]^2)+
+ylab("density")+
+ggtitle(~sigma[2]^2)+
+geom_histogram(aes(y=..density..),fill="gray", colour="black")
+plot(ts(data[5,]),xlab="Time",ylab=~sigma[1]^2)
+```
+
