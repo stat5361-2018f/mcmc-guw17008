@@ -94,7 +94,7 @@ mcmcgibbs=function(delta.start,mu1.start,mu2.start,var1.start,var2.start,count){
 With initial value$\delta^{(0)}=0.5,\mu_1^{(0)}=0,{\sigma_1^2}^{(0)}=0,\mu_2^{(0)}=10,{\sigma_2^2}^{(0)}=10$, we run the 5000 times and throw away the first 2500.
 
 ```{r}
-data=mcmcgibbs(0.5,0,0,10,10,5000)[,-(1:2500)]
+data=mcmcgibbs(0.5,0,0,10,10,50000)[,-(1:10000)]
 
 ```
 
